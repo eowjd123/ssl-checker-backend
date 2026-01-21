@@ -2,6 +2,8 @@ package dto;
 
 public class SSLCertificateInfo {
     private String domain;
+    private String ipAddress;
+    private String pemKey;  // 추가
     private String subjectCN;
     private String subjectO;
     private String subjectOU;
@@ -17,6 +19,12 @@ public class SSLCertificateInfo {
     // Getters and Setters
     public String getDomain() { return domain; }
     public void setDomain(String domain) { this.domain = domain; }
+
+    public String getIpAddress() { return ipAddress; }
+    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
+
+    public String getPemKey() { return pemKey; }
+    public void setPemKey(String pemKey) { this.pemKey = pemKey; }
 
     public String getSubjectCN() { return subjectCN; }
     public void setSubjectCN(String subjectCN) { this.subjectCN = subjectCN; }

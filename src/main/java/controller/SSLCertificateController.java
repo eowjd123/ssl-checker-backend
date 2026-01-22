@@ -26,11 +26,8 @@ public class SSLCertificateController {
     @PostMapping("/check-certificates")
     public List<SSLCertificateInfo> checkCertificates(@RequestBody List<String> domains) {
         System.out.println("Received request for " + domains.size() + " domains");
-        List<SSLCertificateInfo> results = new ArrayList<>();
-
-        for (String domain : domains) {
-            results.add(sslCertificateService.checkCertificate(domain.trim()));
-        }
+        //병렬처리 메서드 호출
+        return sslCertificateService.checkMultipleCertificates(domains);
 
         return results;
     }

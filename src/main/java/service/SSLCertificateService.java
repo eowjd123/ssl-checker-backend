@@ -10,12 +10,23 @@ import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Service
 public class SSLCertificateService {
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+    // 스레드 풀: 동시에 10개 도메인 체크
+    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+
+    // 타임아웃: 5초
+    private static final int SOCKET_TIMEOUT = 5000;
 
     // 도메인별 PEM 키 매핑
     private static final Map<String, String> DOMAIN_PEM_MAP = Map.ofEntries(
@@ -46,10 +57,32 @@ public class SSLCertificateService {
             Map.entry("brittany.vrware.world", "V2_VRWARE.pem")
     );
 
+    /**
+     * 여러 도메인을 병렬로 체크 (성능 개선)
+     */
+    public List<SSLCertificateInfo> checkMultipleCertificates(List<String> domains) {
+        // 각 도메인을 비동기로 처리
+        List<CompletableFuture<SSLCertificateInfo>> futures = domains.stream()
+                .map(domain -> CompletableFuture.supplyAsync(
+                        () -> checkCertificate(domain),
+                        executorService
+                ))
+                .collect(Collectors.toList());
+
+        // 모든 결과가 완료될 때까지 대기 후 반환
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 단일 도메인 SSL 인증서 체크
+     */
     public SSLCertificateInfo checkCertificate(String domain) {
         SSLCertificateInfo info = new SSLCertificateInfo();
         info.setDomain(domain);
 
+        SSLSocket socket = null;
         try {
             domain = domain.replace("https://", "").replace("http://", "");
             if (domain.contains("/")) {
@@ -69,7 +102,11 @@ public class SSLCertificateService {
             }
 
             SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) factory.createSocket(domain, 443);
+            socket = (SSLSocket) factory.createSocket(domain, 443);
+
+            // 타임아웃 설정: 5초
+            socket.setSoTimeout(SOCKET_TIMEOUT);
+
             socket.startHandshake();
 
             Certificate[] certificates = socket.getSession().getPeerCertificates();
@@ -97,10 +134,17 @@ public class SSLCertificateService {
                 }
             }
 
-            socket.close();
-
         } catch (Exception e) {
             info.setError(e.getMessage());
+        } finally {
+            // 소켓 닫기
+            if (socket != null) {
+                try {
+                    socket.close();
+                } catch (Exception e) {
+                    // 무시
+                }
+            }
         }
 
         return info;

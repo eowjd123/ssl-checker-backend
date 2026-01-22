@@ -28,7 +28,5 @@ public class SSLCertificateController {
         System.out.println("Received request for " + domains.size() + " domains");
         //병렬처리 메서드 호출
         return sslCertificateService.checkMultipleCertificates(domains);
-
-        return results;
     }
 }
